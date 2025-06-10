@@ -2,7 +2,7 @@
 # ******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 # *************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 #
-#  (c) 2023.                            (c) 2023.
+#  (c) 2025.                            (c) 2025.
 #  Government of Canada                 Gouvernement du Canada
 #  National Research Council            Conseil national de recherches
 #  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -67,60 +67,61 @@
 #
 
 """
-Implements the default entry point functions for the workflow 
-application.
-
-'run' executes based on either provided lists of work, or files on disk.
-'run_incremental' executes incrementally, usually based on time-boxed intervals.
+This module implements the ObsBlueprint mapping, as well as the workflow 
+entry point that executes the workflow.
 """
 
-import logging
-import sys
-import traceback
+from os.path import basename
 
-from caom2pipe.run_composable import run_by_state, run_by_todo
-from blank2caom2 import file2caom2_augmentation
+from caom2pipe import caom_composable as cc
+from caom2pipe import manage_composable as mc
 
 
-META_VISITORS = [file2caom2_augmentation]
-DATA_VISITORS = []
+__all__ = [
+    'LSSTMapping',
+    'LSSTName',
+]
 
 
-def _run():
+class LSSTName(mc.StorageName):
+    """Naming rules:
+    - support mixed-case file name storage, and mixed-case obs id values
+    - support uncompressed files in storage
     """
-    Uses a todo file to identify the work to be done.
 
-    :return 0 if successful, -1 if there's any sort of failure. Return status
-        is used by airflow for task instance management and reporting.
-    """
-    return run_by_todo(meta_visitors=META_VISITORS, data_visitors=DATA_VISITORS)
+    LSST_NAME_PATTERN = '*'
 
+    def __init__(self, source_names):
+        super().__init__(source_names=source_names)
 
-def run():
-    """Wraps _run in exception handling, with sys.exit calls."""
-    try:
-        result = _run()
-        sys.exit(result)
-    except Exception as e:
-        logging.error(e)
-        tb = traceback.format_exc()
-        logging.debug(tb)
-        sys.exit(-1)
+    def is_valid(self):
+        return True
 
 
-def _run_incremental():
-    """Uses a state file with a timestamp to identify the work to be done.
-    """
-    return run_by_state(meta_visitors=META_VISITORS, data_visitors=DATA_VISITORS)
+class LSSTMapping(cc.TelescopeMapping2):
 
+    def accumulate_blueprint(self, bp):
+        """Configure the telescope-specific ObsBlueprint at the CAOM model Observation level."""
+        self._logger.debug('Begin accumulate_bp.')
+        super().accumulate_blueprint(bp)
 
-def run_incremental():
-    """Wraps _run_incremental in exception handling."""
-    try:
-        _run_incremental()
-        sys.exit(0)
-    except Exception as e:
-        logging.error(e)
-        tb = traceback.format_exc()
-        logging.debug(tb)
-        sys.exit(-1)
+        bp.set('Plane.calibrationLevel', 1)
+        bp.set('Plane.dataProductType', 'image')
+        bp.set('Artifact.productType', 'science')
+        bp.set('Artifact.releaseType', 'data')
+
+        bp.configure_position_axes((1, 2))
+        bp.configure_time_axis(3)
+        bp.configure_energy_axis(4)
+        bp.configure_polarization_axis(5)
+        bp.configure_observable_axis(6)
+        self._logger.debug('Done accumulate_bp.')
+
+    def update(self):
+        """Called to fill multiple CAOM model elements and/or attributes (an n:n relationship between TDM attributes 
+        and CAOM attributes).
+        """
+        return super().update()
+
+    def _update_artifact(self, artifact):
+        pass
