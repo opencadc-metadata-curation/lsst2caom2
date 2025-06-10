@@ -2,7 +2,7 @@
 # ******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 # *************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 #
-#  (c) UTC.                            (c) UTC.
+#  (c) 2025.                            (c) 2025.
 #  Government of Canada                 Gouvernement du Canada
 #  National Research Council            Conseil national de recherches
 #  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -69,17 +69,19 @@
 from mock import patch
 
 from caom2pipe import manage_composable as mc
-from blank2caom2 import composable
+from lsst2caom2 import composable
 
 
 @patch('caom2pipe.client_composable.ClientCollection')
-@patch('caom2pipe.execute_composable.OrganizeExecutes.do_one')
+@patch('caom2pipe.execute_composable.OrganizeExecutesRunnerMeta.do_one')
 def test_run(do_one_mock, clients_mock, test_config, tmp_path, change_test_dir):
     do_one_mock.return_value = (0, None)
     test_f_id = 'test_file_id'
     test_f_name = f'{test_f_id}.fits'
     test_config.change_working_directory(tmp_path.as_posix())
     test_config.proxy_file_name = 'test_proxy.fqn'
+    test_config.logging_level = 'DEBUG'
+    test_config.task_types = [mc.TaskType.INGEST]
     test_config.write_to_file(test_config)
 
     with open(test_config.proxy_fqn, 'w') as f:
